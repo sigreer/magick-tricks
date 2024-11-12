@@ -1,6 +1,8 @@
 # Magick Tricks
 
-A powerful bash script that creates stunning cascading screenshot effects using ImageMagick. Perfect for blog post cover images, presentations, or anywhere you need to showcase multiple screenshots with style.
+A shell script that takes standard screenshots and morphs them into a professional-looking collage with perspective or mirror tilt effects.
+
+![Perspective 1](examples/perspective_1.png)
 
 ## Features
 
@@ -58,7 +60,9 @@ A powerful bash script that creates stunning cascading screenshot effects using 
 
 Output with perspective effect:
 
-![Perspective 1](examples/perspective_1.png) ![Perspective 2](examples/perspective_2.png)
+![Perspective 1](examples/perspective_1.png)
+
+![Perspective 2](examples/perspective_2.png)
 
 ```bash
 ./tricks.sh perspective input_1.png input_2.png input_3.png --cover-shadow=1
