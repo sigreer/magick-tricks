@@ -1,0 +1,14 @@
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.svg
+*.webp
+
+*.log
+*.env
+
+!assets/
+!examples/
+!assets/**/*
+!examples/**/*
