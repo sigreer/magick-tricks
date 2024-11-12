@@ -491,8 +491,8 @@ main() {
 
     merge_tilted_images "$input_image_2_tilted" "$input_image_1_tilted" "$merged_tilted"
     merge_tilted_images "$input_image_1_tilted" "$input_image_2_tilted" "$merged_tilted_alt"
-    add_drop_shadow_to_tilted_images "$merged_tilted" "$merged_tilted_with_drop_shadow"
     add_drop_shadow_to_tilted_images "$merged_tilted_alt" "$merged_tilted_with_drop_shadow_alt"
+    add_drop_shadow_to_tilted_images "$merged_tilted" "$merged_tilted_with_drop_shadow"
     add_drop_shadow_to_center_image "$input_image_3_shadow" "$input_image_3_shadow_centered"
     overlay_center_image "$merged_tilted_with_drop_shadow" "$input_image_3_shadow_centered" "$output_image"
     overlay_center_image "$merged_tilted_with_drop_shadow_alt" "$input_image_3_shadow_centered" "$output_image_alt"

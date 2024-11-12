@@ -2,7 +2,7 @@
 
 A shell script that takes standard screenshots and morphs them into a professional-looking collage with perspective or mirror tilt effects.
 
-![Perspective 1](examples/perspective_1.png)
+![Perspective 1](examples/output_perspective_2.png)
 
 ## Features
 
