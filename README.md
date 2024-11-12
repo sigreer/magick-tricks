@@ -2,7 +2,12 @@
 
 A shell script that takes standard screenshots and morphs them into a professional-looking collage with perspective or mirror tilt effects. Uses ImageMagick with several bundled png filters to add a bit of glamour.
 
-![Perspective 1](examples/output_perspective_2.png)
+```bash
+./tricks.sh perspective screenshot1.png screenshot2.png screenshot3.png --cover-shadow=70% --wide
+```
+Will give you:
+
+![Perspective 1](examples/perspective_1.png)
 
 ## Features
 

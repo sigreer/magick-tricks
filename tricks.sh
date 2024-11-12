@@ -16,8 +16,8 @@ merged_tilted="./merged_tilted.png"
 merged_tilted_alt="./merged_tilted_alt.png"
 input_image_1_tilted="./${input_image_1%.*}_tilted.png"
 input_image_2_tilted="./${input_image_2%.*}_tilted.png"
-merged_tilted_with_drop_shadow="./merged_tilted_with_drop_shadow.png"
-merged_tilted_with_drop_shadow_alt="./merged_tilted_with_drop_shadow_alt.png"
+merged_tilted_with_drop_shadow="${output_dir}merged_tilted_with_drop_shadow.png"
+merged_tilted_with_drop_shadow_alt="${output_dir}merged_tilted_with_drop_shadow_alt.png"
 cover_shadow_1="./assets/shadow1.png"
 cover_shadow_1_height=300
 cover_shadow_2="./assets/shadow2.png"
@@ -30,7 +30,7 @@ background_opacity=0
 no_cleanup=false
 timestamp=$(date '+%Y-%m-%d %H:%M:%S')
 error_log="${error_log:=./error.log}"
-verbosity="${VERBOSITY:-2}" # 0=ERROR, 1=WARN, 2=INFO, 3=DEBUG
+verbosity="${VERBOSITY:-1}" # 0=ERROR, 1=WARN, 2=INFO, 3=DEBUG
 console_output="${CONSOLE_OUTPUT:-1}"
 file_output="${FILE_OUTPUT:-1}"
 compact_mode=false
@@ -72,6 +72,7 @@ process_args() {
     input_files=()
     compact_mode=false
     wide_mode=false
+    add_reflection=false
     if [ $# -lt 1 ]; then
         echo "Error: No subcommand provided"
         show_usage
@@ -117,6 +118,7 @@ process_args() {
                     exit 1
                 fi
                 ;;
+            "--add-reflection") add_reflection=true ;;
             *) input_files+=("$arg") ;;
         esac
     done
@@ -153,6 +155,9 @@ process_args() {
     input_image_1_normalised="${output_dir}${input_1_base}_normalised.png"
     input_image_2_normalised="${output_dir}${input_2_base}_normalised.png"
     input_image_3_normalised="${output_dir}${input_3_base}_normalised.png"
+    input_image_1_decorated="${output_dir}${input_1_base}_decorated.png"
+    input_image_2_decorated="${output_dir}${input_2_base}_decorated.png"
+    input_image_3_decorated="${output_dir}${input_3_base}_decorated.png"
     input_image_1_shadow="${output_dir}${input_1_base}_shadow.png"
     input_image_2_shadow="${output_dir}${input_2_base}_shadow.png"
     input_image_3_shadow="${output_dir}${input_3_base}_shadow.png"
@@ -162,6 +167,12 @@ process_args() {
     input_image_3_shadow_centered="${output_dir}${input_3_base}_shadow_centered.png"
     output_image="${output_dir}${subcommand}_1.png"
     output_image_alt="${output_dir}${subcommand}_2.png"
+    output_image_reflection="${output_dir}${subcommand}_1_reflection.png"
+    output_image_alt_reflection="${output_dir}${subcommand}_2_reflection.png"
+    merged_tilted="${output_dir}${subcommand}_merged_tilted.png"
+    merged_tilted_alt="${output_dir}${subcommand}_merged_tilted_alt.png"
+    merged_tilted_with_drop_shadow="${output_dir}${subcommand}_merged_tilted_with_drop_shadow.png"
+    merged_tilted_with_drop_shadow_alt="${output_dir}${subcommand}_merged_tilted_with_drop_shadow_alt.png"
 }
 
 show_usage() {
@@ -181,6 +192,41 @@ show_usage() {
     echo "  --background-opacity=N    Set background opacity. Decimal or percentage. Defaults to zero (transparent)."
     echo "  --no-cleanup  Keep temporary files (useful for debugging or if you want to use the individual elements)"
     echo "  --output-dir=PATH    Specify output directory for all generated files. Defaults to current directory."
+    echo "  --add-reflection  Add a reflection effect to the final output"
+}
+
+decorate_input_images() {
+    local input_file="$1"
+    local output_file="$2"
+    
+    # Get image dimensions
+    local width=$(magick identify -format "%w" "$input_file")
+    local height=$(magick identify -format "%h" "$input_file")
+    
+    magick "$input_file" \
+        -alpha set \
+        -bordercolor "#333333" \
+        -border 3 \
+        -alpha set \
+        +repage \
+        \( +clone -alpha extract \
+           -draw "fill black polygon 0,0 0,3 3,0" \
+           -draw "fill black polygon 0,$height 0,$((height-3)) 3,$height" \
+           -draw "fill black polygon $width,0 $((width-3)),0 $width,3" \
+           -draw "fill black polygon $width,$height $((width-3)),$height $width,$((height-3))" \
+           -blur 0x2 -level 0,20% \
+           -alpha off \) \
+        -alpha off -compose CopyOpacity -composite \
+        "$output_file"
+    
+    if [ $? -eq 0 ]; then
+        logThis 2 "Done adding border to $input_file"
+        return 0
+    else
+        logThis 0 "Error adding border"
+        cleanup
+        exit 1
+    fi
 }
 
 normalize_height() {
@@ -190,7 +236,6 @@ normalize_height() {
     local output_file="$2"
     local current_height=$(magick identify -format "%h" "$input_file")
     if [ "$current_height" -ne "$target_height" ]; then
-        echo "Normalizing height of $input_file..."
         magick "$input_file" -resize "${target_width}x${target_height}" "$output_file"
     else
         cp "$input_file" "$output_file"
@@ -314,42 +359,45 @@ left_perspective() {
 }
 
 merge_tilted_images() {
-    logThis 3 "Attempting to merge tilted images: $1 and $2"
-    if [ ! -f "$1" ] || [ ! -f "$2" ]; then
+    local input_file_1="$1"
+    local input_file_2="$2"
+    local output_file="$3"
+    logThis 3 "Attempting to merge tilted images: $input_file_1 and $input_file_2"
+    if [ ! -f "$input_file_1" ] || [ ! -f "$input_file_2" ]; then
         logThis 0 "Input files for merge_tilted_images don't exist"
         return 1
     fi
     
     if [ "$wide_mode" = true ]; then
-        local width1=$(magick identify -format "%w" "$1")
-        local width2=$(magick identify -format "%w" "$2")
-        local height=$(magick identify -format "%h" "$1")
+        local width1=$(magick identify -format "%w" "$input_file_1")
+        local width2=$(magick identify -format "%w" "$input_file_2")
+        local height=$(magick identify -format "%h" "$input_file_1")
         local offset=$((width1 + 300))
         local total_width=$((width1 + width2 + 300))
         
         magick -size "${total_width}x${height}" xc:none \
             \( "$1" -alpha set -background none -repage "+0+0" \) \
-            \( "$2" -alpha set -background none -repage "+${offset}+0" \) \
-            -background none -layers merge "$3"
+            \( "$input_file_2" -alpha set -background none -repage "+${offset}+0" \) \
+            -background none -layers merge "$output_file"
     elif [ "$compact_mode" = true ]; then
-        local width1=$(magick identify -format "%w" "$1")
-        local width2=$(magick identify -format "%w" "$2")
-        local height=$(magick identify -format "%h" "$1")
+        local width1=$(magick identify -format "%w" "$input_file_1")
+        local width2=$(magick identify -format "%w" "$input_file_2")
+        local height=$(magick identify -format "%h" "$input_file_1")
         local offset=$((width1 - 200))
         local total_width=$((width1 + width2 - 200))
         
         magick -size "${total_width}x${height}" xc:none \
             \( "$1" -alpha set -background none -repage "+0+0" \) \
-            \( "$2" -alpha set -background none -repage "+${offset}+0" \) \
-            -background none -layers merge "$3"
+            \( "$input_file_2" -alpha set -background none -repage "+${offset}+0" \) \
+            -background none -layers merge "$output_file"
     else
-        magick "$1" "$2" -alpha set -background none +append "$3"
+        magick "$input_file_1" "$input_file_2" -alpha set -background none +append "$output_file"
     fi
     
     local status=$?
     if [ $status -eq 0 ]; then
         logThis 2 "Successfully merged tilted images"
-        if [ ! -f "$3" ]; then
+        if [ ! -f "$output_file" ]; then
             logThis 0 "Merged file wasn't created despite successful command"
             return 1
         fi
@@ -361,20 +409,29 @@ merge_tilted_images() {
 }
 
 add_drop_shadow_to_tilted_images() {
-    logThis 3 "Attempting to add drop shadow to tilted image: $1"
-    if [ ! -f "$1" ]; then
+    local input_file="$1"
+    local output_file="$2"
+    logThis 3 "Attempting to add drop shadow to tilted image: $input_file"
+    if [ ! -f "$input_file" ]; then
         logThis 0 "Input file for add_drop_shadow_to_tilted_images doesn't exist"
         return 1
     fi
     
-    magick "$1" \
-        \( +clone -alpha extract -background none -shadow "80x20+15+15" \) \
-        +swap -background none -layers merge -alpha set \
-        "$2"
+    # Create a soft, semi-transparent shadow that preserves transparency
+    magick "$input_file" \
+        \( +clone \
+           -background black \
+           -shadow 60x5+5+5 \
+        \) \
+        +swap \
+        -background none \
+        -layers merge \
+        "$output_file"
+    
     local status=$?
     if [ $status -eq 0 ]; then
         logThis 2 "Successfully added drop shadow to tilted images"
-        if [ ! -f "$2" ]; then
+        if [ ! -f "$output_file" ]; then
             logThis 0 "Drop shadow file wasn't created despite successful command"
             return 1
         fi
@@ -386,10 +443,17 @@ add_drop_shadow_to_tilted_images() {
 }
 
 add_drop_shadow_to_center_image() {
-    magick "$1" \
-        \( +clone -background none -shadow "60x10+8+8" \) \
+    local input_file="$1"
+    local output_file="$2"
+    logThis 3 "Attempting to add drop shadow to center image: $input_file"
+    if [ ! -f "$input_file" ]; then
+        logThis 0 "Input file for add_drop_shadow_to_center_image doesn't exist"
+        return 1
+    fi
+    magick "$input_file" \
+        \( +clone -background none -shadow "30x5+1+1" \) \
         +swap -background none -layers merge -alpha set \
-        "$2"
+        "$output_file"
     if [ $? -eq 0 ]; then
         logThis 2 "Done adding drop shadow to center image"
         return 0
@@ -401,14 +465,22 @@ add_drop_shadow_to_center_image() {
 }
 
 overlay_center_image() {
+    local input_file_1="$1" 
+    local input_file_2="$2"
+    local output_file="$3"
+    logThis 3 "Attempting to overlay center image: $input_file_1 and $input_file_2"
+    if [ ! -f "$input_file_1" ] || [ ! -f "$input_file_2" ]; then
+        logThis 0 "Input files for overlay_center_image don't exist"
+        return 1
+    fi
     local scale_factor=1
     if [ "$compact_mode" = true ]; then
         scale_factor=0.85
     fi
-    local original_width=$(magick identify -format "%w" "$2")
-    local original_height=$(magick identify -format "%h" "$2")
-    local combined_width=$(magick identify -format "%w" "$1")
-    local combined_height=$(magick identify -format "%h" "$1")
+    local original_width=$(magick identify -format "%w" "$input_file_2")
+    local original_height=$(magick identify -format "%h" "$input_file_2")
+    local combined_width=$(magick identify -format "%w" "$input_file_1")
+    local combined_height=$(magick identify -format "%h" "$input_file_1")
     local new_width=$(printf "%.0f" $(echo "$original_width * $scale_factor" | bc))
     local new_height=$(printf "%.0f" $(echo "$original_height * $scale_factor" | bc))
     local x_offset=$(( (combined_width - new_width) / 2 ))
@@ -432,16 +504,50 @@ overlay_center_image() {
     
     logThis 3 "Using background color: ${bg_color_with_opacity}"
     magick -size "${combined_width}x${combined_height}" xc:"${bg_color_with_opacity}" \
-        \( "$1" -alpha set -background none -repage "+0+0" \) \
-        \( "$2" -alpha set -background none -resize ${new_width}x${new_height} -repage "+${x_offset}+${y_offset}" \) \
+        \( "$input_file_1" -alpha set -background none -repage "+0+0" \) \
+        \( "$input_file_2" -alpha set -background none -resize ${new_width}x${new_height} -repage "+${x_offset}+${y_offset}" \) \
         -background none -layers merge -alpha set \
-        "$3"
+        "$output_file"
         
     if [ $? -eq 0 ]; then
-        logThis 2 "Done overlaying center image $2"
+        logThis 2 "Done overlaying center image $output_file"
         return 0
     else
-        logThis 0 "Error overlaying center image $2"
+        logThis 0 "Error overlaying center image $output_file"
+        cleanup
+        exit 1
+    fi
+}
+
+add_reflection() {
+    local input_file="$1"
+    local output_file="$2"
+    logThis 3 "Attempting to create reflection of $input_file"
+    
+    magick \( "$input_file" \) \
+        \( "$input_file" \
+           -alpha set \
+           -channel A -evaluate multiply 0.2 \
+           -background none \
+           -shear 20x0 \
+           -flip \
+           -repage -300+0\! \) \
+        -background none \
+        -append \
+        "$output_file"
+
+    # Calculate the original width and determine the new width
+    local original_width=$(magick identify -format "%w" "$output_file")
+    local new_width=$((original_width - 300))
+
+    # Crop to new_width x 1080 from top-left
+    magick "$output_file" -crop "${new_width}x1080+0+0" +repage "$output_file"
+
+    if [ $? -eq 0 ]; then
+        logThis 2 "Done adding reflection of $input_file"
+        return 0
+    else
+        logThis 0 "Error adding reflection of $input_file"
         cleanup
         exit 1
     fi
@@ -464,9 +570,12 @@ main() {
     normalize_height "$input_image_1" "$input_image_1_normalised"
     normalize_height "$input_image_2" "$input_image_2_normalised"
     normalize_height "$input_image_3" "$input_image_3_normalised"
-    add_cover_shadow "$input_image_1_normalised" "$input_image_1_shadow" "$shadow_preset"
-    add_cover_shadow "$input_image_2_normalised" "$input_image_2_shadow" "$shadow_preset"
-    add_cover_shadow "$input_image_3_normalised" "$input_image_3_shadow" "$shadow_preset"
+    decorate_input_images "$input_image_1_normalised" "$input_image_1_decorated"
+    decorate_input_images "$input_image_2_normalised" "$input_image_2_decorated"
+    decorate_input_images "$input_image_3_normalised" "$input_image_3_decorated"
+    add_cover_shadow "$input_image_1_decorated" "$input_image_1_shadow" "$shadow_preset"
+    add_cover_shadow "$input_image_2_decorated" "$input_image_2_shadow" "$shadow_preset"
+    add_cover_shadow "$input_image_3_decorated" "$input_image_3_shadow" "$shadow_preset"
 
     case "$subcommand" in
         perspective)
@@ -496,6 +605,12 @@ main() {
     add_drop_shadow_to_center_image "$input_image_3_shadow" "$input_image_3_shadow_centered"
     overlay_center_image "$merged_tilted_with_drop_shadow" "$input_image_3_shadow_centered" "$output_image"
     overlay_center_image "$merged_tilted_with_drop_shadow_alt" "$input_image_3_shadow_centered" "$output_image_alt"
+    
+    if [ "$add_reflection" = true ]; then
+        add_reflection "$output_image" "$output_image_reflection"
+        add_reflection "$output_image_alt" "$output_image_alt_reflection"
+    fi
+    
     cleanup
     logThis 2 "Created cascade image: $output_image"
     logThis 2 "Created inverted cascade image: $output_image_alt"
