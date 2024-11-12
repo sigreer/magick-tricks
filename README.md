@@ -1,33 +1,40 @@
 # Magick Tricks
 
-A shell script that takes standard screenshots and morphs them into a professional-looking collage with perspective or mirror tilt effects.
+A shell script that takes standard screenshots and morphs them into a professional-looking collage with perspective or mirror tilt effects. Uses ImageMagick with several bundled png filters to add a bit of glamour.
 
 ![Perspective 1](examples/output_perspective_2.png)
 
 ## Features
 
-- Creates professional-looking screenshot collages with perspective or mirror tilt effects
-- Automatically generates two variants of each effect (normal and inverted)
-- Customizable shadow effects with 3 presets
-- Adjustable background colors and opacity
-- Supports compact or wide layouts
+- Works with three images - centre, left and right.
+- Horizontal vanishing point perpsective preset
+- Vertical mirror tilt preset
+- Generates two variants of each effect (inward and outward facing side images)
+- Customizable cover shadow effects with 3 presets (3 looks the slickest)
+- Adjustable background colours and opacity
+- Compact, standard or wide layout (wide is default as the others don't cut the mustard yet)
 - Preserves image quality with automatic height normalization
 
-## Prerequisites
+## To-Do
 
-- ImageMagick
-- Bash shell
-- BC (Basic Calculator)
+Lots. Sorting the drop shadows out and adding some input handling for different aspect ratios are probably highest on my list.
 
 ## Installation
 
-1. Clone this repository:
-   ```bash
-   git clone https://github.com/yourusername/magick-tricks.git
-   cd magick-tricks
-   ```
+### Prerequisites
 
-2. Make the script executable:
+- ImageMagick
+- bc
+
+### Clone this repository
+
+```bash
+git clone https://github.com/yourusername/magick-tricks.git
+cd magick-tricks
+```
+
+### Make the script executable
+
    ```bash
    chmod +x tricks.sh
    ```
@@ -101,7 +108,6 @@ Input images:
     --cover-shadow-opacity=50%
 ```
 
-
 ## Tips
 
 1. For best results, use input images with:
@@ -111,31 +117,18 @@ Input images:
 
 2. The script automatically normalizes image heights to 768px while maintaining aspect ratios.
 
-3. Use the `--no-cleanup` option to inspect intermediate files when troubleshooting.
+3. Use the `--no-cleanup` option to inspect intermediate files when troubleshooting OR if you want to use one of the elements as part of the script. It's deliberately broken down into more steps than are necessary for this reason.
 
 ## Troubleshooting
 
-If you encounter issues:
+Make sure ImageMagick is properly installed:
 
-1. Ensure ImageMagick is properly installed:
-   ```bash
-   convert --version
-   ```
+```bash
+magick --version
+```
 
-2. Check file permissions:
-   ```bash
-   chmod +x tricks.sh
-   ```
+The script was created with ImageMagick 7 and will likely not work with IM6 without some minor modifications due to deprecated handling of alpha channels.
 
-3. Verify input image dimensions:
-   ```bash
-   identify input_1.png
-   ```
+This is a long way from finished and does not have much capacity for normalising images of different sizes or aspect ratios. The examples use 1600x768 images. which is roughly a browser's viewport.
 
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
+Questions, comments etc. - get in touch!
