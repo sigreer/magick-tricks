@@ -12,3 +12,9 @@
 !examples/
 !assets/**/*
 !examples/**/*
+
+__*
+assets/__*
+examples/__*
+*/**/__*
+
