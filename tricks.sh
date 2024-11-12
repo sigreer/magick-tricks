@@ -12,19 +12,19 @@ input_image_3_normalised="./${input_image_3%.*}_normalised.png"
 input_image_1_shadow="./${input_image_1%.*}_shadow.png"
 input_image_2_shadow="./${input_image_2%.*}_shadow.png"
 input_image_3_shadow="./${input_image_3%.*}_shadow.png"
-merged_tilted="./${input_image_1%.*}_${input_image_2%.*}_merged_tilted.png"
-merged_tilted_alt="./${input_image_2%.*}_${input_image_1%.*}_merged_tilted_alt.png"
+merged_tilted="./merged_tilted.png"
+merged_tilted_alt="./merged_tilted_alt.png"
 input_image_1_tilted="./${input_image_1%.*}_tilted.png"
 input_image_2_tilted="./${input_image_2%.*}_tilted.png"
-merged_tilted_shadow="./${input_image_1%.*}_${input_image_2%.*}_merged_tilted_shadow.png"
-merged_tilted_shadow_alt="./${input_image_2%.*}_${input_image_1%.*}_merged_tilted_shadow_alt.png"
-shadow_1="./assets/shadow1.png"
-shadow_1_height=300
-shadow_2="./assets/shadow2.png"
-shadow_2_height=500
-shadow_3="./assets/shadow3.png"
-shadow_3_height=768
-shadow_opacity=0.7
+merged_tilted_with_drop_shadow="./merged_tilted_with_drop_shadow.png"
+merged_tilted_with_drop_shadow_alt="./merged_tilted_with_drop_shadow_alt.png"
+cover_shadow_1="./assets/shadow1.png"
+cover_shadow_1_height=300
+cover_shadow_2="./assets/shadow2.png"
+cover_shadow_2_height=500
+cover_shadow_3="./assets/shadow3.png"
+cover_shadow_3_height=768
+cover_shadow_opacity=0.7
 background_color="#000000"
 background_opacity=0
 no_cleanup=false
@@ -36,6 +36,7 @@ file_output="${FILE_OUTPUT:-1}"
 compact_mode=false
 wide_mode=true
 shadow_preset=1
+output_dir="./"
 
 logThis() {
     local severity="$1"
@@ -89,17 +90,30 @@ process_args() {
             "--background-opacity=*")
                 background_opacity="${arg#*=}"
                 ;;
-            --shadow=*)
+            --cover-shadow=*)
                 shadow_preset="${arg#*=}"
                 if [[ ! "$shadow_preset" =~ ^[1-3]$ ]]; then
-                    logThis 0 "Invalid shadow preset: $shadow_preset. Must be 1, 2, or 3."
+                    logThis 0 "Invalid cover shadow preset: $shadow_preset. Must be 1, 2, or 3."
                     exit 1
                 fi
                 ;;
-            --shadow-opacity=*)
+            --cover-shadow-opacity=*)
                 shadow_opacity="${arg#*=}"
+                # Convert percentage to decimal if needed
+                if [[ "$shadow_opacity" == *"%" ]]; then
+                    shadow_opacity=$(echo "scale=2; ${shadow_opacity%\%} / 100" | bc)
+                fi
                 if ! [[ "$shadow_opacity" =~ ^0*\.?[0-9]+$ ]] || [ "$(echo "$shadow_opacity > 1" | bc -l)" -eq 1 ] || [ "$(echo "$shadow_opacity < 0" | bc -l)" -eq 1 ]; then
-                    logThis 0 "Invalid shadow opacity: $shadow_opacity. Must be between 0 and 1."
+                    logThis 0 "Invalid cover shadow opacity: $shadow_opacity. Must be between 0 and 1 or 0% and 100%."
+                    exit 1
+                fi
+                ;;
+            --output-dir=*)
+                output_dir="${arg#*=}"
+                # Normalize path: ensure trailing slash and resolve relative paths
+                output_dir="$(realpath -m "$output_dir")/"
+                if [ ! -d "$output_dir" ]; then
+                    logThis 0 "Output directory does not exist: $output_dir"
                     exit 1
                 fi
                 ;;
@@ -115,24 +129,39 @@ process_args() {
     input_image_2="${input_files[1]}"
     input_image_3="${input_files[2]}"
     
+    # Normalize all input paths using realpath
+    input_image_1="$(realpath -m "${input_files[0]}")"
+    input_image_2="$(realpath -m "${input_files[1]}")"
+    input_image_3="$(realpath -m "${input_files[2]}")"
+    
     for img in "$input_image_1" "$input_image_2" "$input_image_3"; do
         if [ ! -f "$img" ]; then
             logThis 0 "File '$img' does not exist"
             exit 1
         fi
     done
-    input_image_1_normalised="./${input_image_1%.*}_normalised.png"
-    input_image_2_normalised="./${input_image_2%.*}_normalised.png"
-    input_image_3_normalised="./${input_image_3%.*}_normalised.png"
-    input_image_1_shadow="./${input_image_1%.*}_shadow.png"
-    input_image_2_shadow="./${input_image_2%.*}_shadow.png"
-    input_image_3_shadow="./${input_image_3%.*}_shadow.png"
-    input_image_1_tilted="./${input_image_1%.*}_tilted.png"
-    input_image_2_tilted="./${input_image_2%.*}_tilted.png"
-    input_image_3_tilted="./${input_image_3%.*}_tilted.png"
-    input_image_3_shadow_centered="./${input_image_3%.*}_shadow_centered.png"
-    output_image="./${subcommand}_1.png"
-    output_image_alt="./${subcommand}_2.png"
+
+    # Get base names without extension for cleaner temp file naming
+    input_1_base="${input_image_1##*/}"
+    input_1_base="${input_1_base%.*}"
+    input_2_base="${input_image_2##*/}"
+    input_2_base="${input_2_base%.*}"
+    input_3_base="${input_image_3##*/}"
+    input_3_base="${input_3_base%.*}"
+    
+    # Update temp file paths with cleaner naming
+    input_image_1_normalised="${output_dir}${input_1_base}_normalised.png"
+    input_image_2_normalised="${output_dir}${input_2_base}_normalised.png"
+    input_image_3_normalised="${output_dir}${input_3_base}_normalised.png"
+    input_image_1_shadow="${output_dir}${input_1_base}_shadow.png"
+    input_image_2_shadow="${output_dir}${input_2_base}_shadow.png"
+    input_image_3_shadow="${output_dir}${input_3_base}_shadow.png"
+    input_image_1_tilted="${output_dir}${input_1_base}_tilted.png"
+    input_image_2_tilted="${output_dir}${input_2_base}_tilted.png"
+    input_image_3_tilted="${output_dir}${input_3_base}_tilted.png"
+    input_image_3_shadow_centered="${output_dir}${input_3_base}_shadow_centered.png"
+    output_image="${output_dir}${subcommand}_1.png"
+    output_image_alt="${output_dir}${subcommand}_2.png"
 }
 
 show_usage() {
@@ -146,11 +175,12 @@ show_usage() {
     echo "Options:"
     echo "  --compact     Overlap the background images for a more compact layout"
     echo "  --wide        Add a gap in between the output images for better visibility of each screenshot (default)."
-    echo "  --shadow=N    Use shadow preset (1, 2, or 3), defaults to 1."
-    echo "  --shadow-opacity=N    Set shadow opacity. Decimal or percentage. Defaults to 70%."
+    echo "  --cover-shadow=N    Use cover shadow preset (1, 2, or 3), defaults to 1."
+    echo "  --cover-shadow-opacity=N    Set cover shadow opacity. Decimal (0-1) or percentage (0-100%). Defaults to 70%."
     echo "  --background-color=HEX    Set background color. Defaults to black (#000000)."
     echo "  --background-opacity=N    Set background opacity. Decimal or percentage. Defaults to zero (transparent)."
     echo "  --no-cleanup  Keep temporary files (useful for debugging or if you want to use the individual elements)"
+    echo "  --output-dir=PATH    Specify output directory for all generated files. Defaults to current directory."
 }
 
 normalize_height() {
@@ -175,43 +205,37 @@ normalize_height() {
     fi
 }
 
-shadow() {
+add_cover_shadow() {
     local input_file="$1"
     local output_file="$2"
-    local shadow_preset="${3:-1}"  # Default to shadow_1 if not specified
+    local cover_shadow_preset="${3:-1}"  # Default to cover_shadow_1 if not specified
     
-    # Select shadow file and height based on preset
-    local shadow_file="./shadow${shadow_preset}.png"
-    local shadow_height
-    case "$shadow_preset" in
-        1) shadow_file="$shadow_1"; shadow_height=$shadow_1_height ;;
-        2) shadow_file="$shadow_2"; shadow_height=$shadow_2_height ;;
-        3) shadow_file="$shadow_3"; shadow_height=$shadow_3_height ;;
-        *) logThis 0 "Invalid shadow preset: $shadow_preset"; return 1 ;;
+    # Select cover shadow file and height based on preset
+    local cover_shadow_file="./shadow${cover_shadow_preset}.png"
+    local cover_shadow_height
+    case "$cover_shadow_preset" in
+        1) cover_shadow_file="$cover_shadow_1"; cover_shadow_height=$cover_shadow_1_height ;;
+        2) cover_shadow_file="$cover_shadow_2"; cover_shadow_height=$cover_shadow_2_height ;;
+        3) cover_shadow_file="$cover_shadow_3"; cover_shadow_height=$cover_shadow_3_height ;;
+        *) logThis 0 "Invalid cover shadow preset: $cover_shadow_preset"; return 1 ;;
     esac
     
-    if [ ! -f "$shadow_file" ]; then
-        logThis 0 "Error: Shadow file '$shadow_file' not found"
-        cleanup
-        exit 1
-    fi
-    
-    # Get dimensions of input image and shadow
+    # Get dimensions of input image and cover shadow
     local img_width=$(magick identify -format "%w" "$input_file")
-    local shadow_width=$(magick identify -format "%w" "$shadow_file")
+    local cover_shadow_width=$(magick identify -format "%w" "$cover_shadow_file")
     
-    local x_offset=$(( (img_width - shadow_width) / 2 ))
+    local x_offset=$(( (img_width - cover_shadow_width) / 2 ))
     
     magick "$input_file" \
-        \( "$shadow_file" -resize "x${shadow_height}" -alpha set -channel A -evaluate multiply "${shadow_opacity}" \) \
+        \( "$cover_shadow_file" -resize "x${cover_shadow_height}" -alpha set -channel A -evaluate multiply "${cover_shadow_opacity}" \) \
         -gravity north -geometry "+${x_offset}+0" \
         -composite "$output_file"
-        
+    
     if [ $? -eq 0 ]; then
-        logThis 2 "Done adding shadow to $input_file using shadow preset $shadow_preset"
+        logThis 2 "Done adding cover shadow to $input_file using cover shadow preset $cover_shadow_preset"
         return 0
     else
-        logThis 0 "Error adding shadow"
+        logThis 0 "Error adding cover shadow"
         cleanup
         exit 1
     fi
@@ -336,10 +360,10 @@ merge_tilted_images() {
     fi
 }
 
-add_shadow_to_tilted_images() {
-    logThis 3 "Attempting to add shadow to tilted image: $1"
+add_drop_shadow_to_tilted_images() {
+    logThis 3 "Attempting to add drop shadow to tilted image: $1"
     if [ ! -f "$1" ]; then
-        logThis 0 "Input file for add_shadow_to_tilted_images doesn't exist"
+        logThis 0 "Input file for add_drop_shadow_to_tilted_images doesn't exist"
         return 1
     fi
     
@@ -349,28 +373,28 @@ add_shadow_to_tilted_images() {
         "$2"
     local status=$?
     if [ $status -eq 0 ]; then
-        logThis 2 "Successfully added shadow to tilted images"
+        logThis 2 "Successfully added drop shadow to tilted images"
         if [ ! -f "$2" ]; then
-            logThis 0 "Shadow file wasn't created despite successful command"
+            logThis 0 "Drop shadow file wasn't created despite successful command"
             return 1
         fi
         return 0
     else
-        logThis 0 "Error adding shadow to tilted images (status: $status)"
+        logThis 0 "Error adding drop shadow to tilted images (status: $status)"
         return 1
     fi
 }
 
-add_shadow_to_center_image() {
+add_drop_shadow_to_center_image() {
     magick "$1" \
         \( +clone -background none -shadow "60x10+8+8" \) \
         +swap -background none -layers merge -alpha set \
         "$2"
     if [ $? -eq 0 ]; then
-        logThis 2 "Done adding shadow to center image"
+        logThis 2 "Done adding drop shadow to center image"
         return 0
     else
-        logThis 0 "Error adding shadow to center image"
+        logThis 0 "Error adding drop shadow to center image"
         cleanup
         exit 1
     fi
@@ -389,14 +413,24 @@ overlay_center_image() {
     local new_height=$(printf "%.0f" $(echo "$original_height * $scale_factor" | bc))
     local x_offset=$(( (combined_width - new_width) / 2 ))
     local y_offset=$(( (combined_height - new_height - 10) / 2 ))
+    
+    # Ensure background color starts with #
+    [[ $background_color != \#* ]] && background_color="#${background_color}"
+    
+    # Get opacity value (0-100)
     local bg_opacity_value
     if [[ "$background_opacity" =~ ^[0-9]+$ ]]; then
         bg_opacity_value=$background_opacity
     else
         bg_opacity_value=$(echo "$background_opacity * 100" | bc)
     fi
-    local bg_color_with_opacity="${background_color}${bg_opacity_value}"
-
+    
+    # Clean the background color (remove #) and ensure it's 6 digits
+    local clean_bg_color=${background_color#\#}
+    # Add opacity as hex to create rgba color
+    local bg_color_with_opacity="#${clean_bg_color}$(printf "%02x" $bg_opacity_value)"
+    
+    logThis 3 "Using background color: ${bg_color_with_opacity}"
     magick -size "${combined_width}x${combined_height}" xc:"${bg_color_with_opacity}" \
         \( "$1" -alpha set -background none -repage "+0+0" \) \
         \( "$2" -alpha set -background none -resize ${new_width}x${new_height} -repage "+${x_offset}+${y_offset}" \) \
@@ -418,7 +452,7 @@ cleanup() {
         logThis 2 "Skipping cleanup..."
         return 0
     fi
-    rm -f "$merged_tilted" "$merged_tilted_shadow" "$merged_tilted_shadow_alt" \
+    rm -f "$merged_tilted" "$merged_tilted_alt" "$merged_tilted_with_drop_shadow" "$merged_tilted_with_drop_shadow_alt" \
         "$input_image_1_normalised" "$input_image_2_normalised" "$input_image_3_normalised" \
         "$input_image_1_shadow" "$input_image_2_shadow" "$input_image_3_shadow" \
         "$input_image_1_tilted" "$input_image_2_tilted" \
@@ -430,9 +464,9 @@ main() {
     normalize_height "$input_image_1" "$input_image_1_normalised"
     normalize_height "$input_image_2" "$input_image_2_normalised"
     normalize_height "$input_image_3" "$input_image_3_normalised"
-    shadow "$input_image_1_normalised" "$input_image_1_shadow" "$shadow_preset"
-    shadow "$input_image_2_normalised" "$input_image_2_shadow" "$shadow_preset"
-    shadow "$input_image_3_normalised" "$input_image_3_shadow" "$shadow_preset"
+    add_cover_shadow "$input_image_1_normalised" "$input_image_1_shadow" "$shadow_preset"
+    add_cover_shadow "$input_image_2_normalised" "$input_image_2_shadow" "$shadow_preset"
+    add_cover_shadow "$input_image_3_normalised" "$input_image_3_shadow" "$shadow_preset"
 
     case "$subcommand" in
         perspective)
@@ -457,11 +491,11 @@ main() {
 
     merge_tilted_images "$input_image_2_tilted" "$input_image_1_tilted" "$merged_tilted"
     merge_tilted_images "$input_image_1_tilted" "$input_image_2_tilted" "$merged_tilted_alt"
-    add_shadow_to_tilted_images "$merged_tilted" "$merged_tilted_shadow"
-    add_shadow_to_tilted_images "$merged_tilted_alt" "$merged_tilted_shadow_alt"
-    add_shadow_to_center_image "$input_image_3_shadow" "$input_image_3_shadow_centered"
-    overlay_center_image "$merged_tilted_shadow" "$input_image_3_shadow_centered" "$output_image"
-    overlay_center_image "$merged_tilted_shadow_alt" "$input_image_3_shadow_centered" "$output_image_alt"
+    add_drop_shadow_to_tilted_images "$merged_tilted" "$merged_tilted_with_drop_shadow"
+    add_drop_shadow_to_tilted_images "$merged_tilted_alt" "$merged_tilted_with_drop_shadow_alt"
+    add_drop_shadow_to_center_image "$input_image_3_shadow" "$input_image_3_shadow_centered"
+    overlay_center_image "$merged_tilted_with_drop_shadow" "$input_image_3_shadow_centered" "$output_image"
+    overlay_center_image "$merged_tilted_with_drop_shadow_alt" "$input_image_3_shadow_centered" "$output_image_alt"
     cleanup
     logThis 2 "Created cascade image: $output_image"
     logThis 2 "Created inverted cascade image: $output_image_alt"
